@@ -1,0 +1,3 @@
+include src/argcompgen/*
+include LICENSE
+include README.md
