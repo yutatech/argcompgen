@@ -21,5 +21,12 @@ ex:
 argcompgen script.py zsh
 ```
 
+## Temporary Usage of Completion Script
+### zsh
+`export fpath=( /path/to/_comp_script "${fpath[@]}" ) && compinit`
+
+### bash
+`source comp_script.bash`
+
 ## License
 このプロジェクトはMITライセンスの下で提供されています。詳細は`LICENSE`ファイルを参照してください。
