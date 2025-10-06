@@ -41,7 +41,7 @@ def load_parser_safely(path: str) -> argparse.ArgumentParser:
     return captured_parser
 
 
-def generate_bash_completion(parser, prog_name: str, func_name=None, level=0):
+def generate_bash_completion(parser, prog_name: str, func_name=None, level=0, cmd=None):
     func_name = func_name or f"_{prog_name.replace('-', '_')}"
     indent = "    " * level
     script = []
@@ -123,7 +123,7 @@ def generate_bash_completion(parser, prog_name: str, func_name=None, level=0):
 
     script.append("}")
     if level == 0:
-        script.append(f"complete -F {func_name} {prog_name}")
+        script.append(f"complete -F {func_name} {cmd}")
 
     if subparsers_action:
         script = sub_command_func + script
@@ -131,7 +131,9 @@ def generate_bash_completion(parser, prog_name: str, func_name=None, level=0):
     return "\n".join(script)
 
 
-def generate_zsh_completion(parser: argparse.ArgumentParser, prog_name=None, level=0):
+def generate_zsh_completion(
+    parser: argparse.ArgumentParser, prog_name=None, level=0, cmd=None
+):
     """argparse parser から zsh 補完スクリプトを再帰生成する"""
     if prog_name is None:
         prog_name = parser.prog
@@ -248,27 +250,52 @@ def generate_zsh_completion(parser: argparse.ArgumentParser, prog_name=None, lev
 
     if level == 0:
         lines = (
-            [f"#compdef {prog_name}"] + lines + [f"\ncompdef _{prog_name} {prog_name}"]
+            [f"#compdef {cmd}"] + lines + [f"\ncompdef _{prog_name} {cmd}"]
         )
 
     return "\n".join(lines)
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: generate_completion.py <path_to_cli> <bash|zsh>")
+    argparser = argparse.ArgumentParser(
+        description="Generate bash/zsh completion scripts from an argparse-based CLI"
+    )
+    argparser.add_argument("path_to_shell", help="Path to the Python CLI script")
+    argparser.add_argument("shell", choices=["bash", "zsh"], help="Target shell")
+    argparser.add_argument("-d", "--dir", help="Output directory", default=".")
+    argparser.add_argument(
+        "-c", "--command", help="Command name (if different from script name)"
+    )
+    args = argparser.parse_args()
+
+    path = args.path_to_shell
+    shell = args.shell
+    output_dir = args.dir
+    cmd = prog = args.command
+
+    if not os.path.isfile(path):
+        print(f"Error: file '{path}' not found")
         sys.exit(1)
 
-    path, shell = sys.argv[1:3]
+    if not prog:
+        prog = os.path.basename(path).split(".")[0]
+
+    if not cmd:
+        cmd = path
+
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    file_name = os.path.basename(prog).split(".")[0]
+
     parser = load_parser_safely(path)
-    prog = os.path.basename(path).replace(".py", "")
 
     if shell == "bash":
-        with open(f"{prog}_completion.bash", "w") as f:
-            f.write(generate_bash_completion(parser, prog))
+        with open(f"{output_dir}/{file_name}", "w") as f:
+            f.write(generate_bash_completion(parser, prog, cmd=cmd))
     elif shell == "zsh":
-        with open(f"_{prog}", "w") as f:
-            f.write(generate_zsh_completion(parser, prog))
+        with open(f"{output_dir}/_{file_name}", "w") as f:
+            f.write(generate_zsh_completion(parser, prog, cmd=cmd))
     else:
         print("Error: shell must be 'bash' or 'zsh'")
         sys.exit(1)
